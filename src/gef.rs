@@ -1,5 +1,6 @@
 use std::{env, error::Error, fs::{File}, io::Read};
 mod loader;
+mod runtime;
 
 const VERSION: &str = "
     Grond Runtime(GRT)
@@ -57,4 +58,6 @@ fn main() {
     let mut gef_file_data = Vec::new();
     let _ = gef_file.read_to_end(&mut gef_file_data);
     loader::load_gef(gef_file_data);
+
+    ()
 }
