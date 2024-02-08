@@ -1,12 +1,26 @@
-use std::{collections::HashMap, i64, u64};
+use std::collections::HashMap;
+
+use nom::{
+    bytes::{complete::{tag, take}},
+    IResult, number::complete::{be_u8, be_u64, be_u32}
+};
 
 const MAGIC_NUMBER: [u8; 4] = [0x67, 0x72, 0x6E, 0x64];
 
 #[derive(Debug)]
-pub enum GEF_Type {
+pub enum GEFType {
     Executable,
     DynamicLib,
     StaticLib
+}
+
+#[derive(Debug)]
+pub struct GEFHeader {
+    magic_number: [u8; 4],
+    version: (u8, u8, u8),
+    gef_file_type: GEFType,
+    entrypoint: u64,
+    map_size: u32
 }
 
 #[derive(Debug)]
@@ -15,58 +29,56 @@ pub struct Map {
     data_table: HashMap<usize, ([u8; 3], [u8; 1], [u8; 8])>
 }
 
-pub fn load_gef(gef_file_data: Vec<u8>) -> Option<((u8, u8, u8), GEF_Type, usize)>{
-    
-    if gef_file_data.get(0..4) != MAGIC_NUMBER.get(0..4) {
-        todo!();
-        return None;
-    }
+pub struct MapField {
+    name: [u8; 7],
+    is_private: u8,
+    address: u32
+}
 
-    let version = (gef_file_data[5], gef_file_data[6], gef_file_data[7]);
-    print!("version: {:?}", version);
+pub fn load_gef_header(gef_file_data: &[u8]) ->IResult<&[u8], GEFHeader> {
+    // Parsing magic number
+    let (input, magic_number) = tag(&MAGIC_NUMBER)(gef_file_data)?;
+    let magic_number = magic_number.try_into().unwrap();
 
-    let gef_type: GEF_Type = match gef_file_data[7] {
-        1=>GEF_Type::Executable,
-        2=>GEF_Type::StaticLib,
-        3=>GEF_Type::DynamicLib,
-        _=>return None
+    // parsing version
+    let (input, version) = take(3u8)(input)?;
+
+    // parsing GEF file type
+    let (input, gef_file_type) = be_u8(input)?;
+    let gef_file_type = match gef_file_type {
+        0=>GEFType::Executable,
+        1=>GEFType::DynamicLib,
+        2=>GEFType::StaticLib,
+        _=>panic!("Failed to loading file because of bad GEF file type")
     };
 
-    let entrypoint = gef_file_data.as_integer(8, 15);
+    // Parsing entrypoint
+    let (input, entrypoint) = be_u64(input)?;
 
-    println!("entrypoint: {}", entrypoint);
-    
-    let map_size = gef_file_data.as_integer(16, 19);
-    println!("map size: {}",map_size);
-
-    let function_table_size = gef_file_data.as_integer(20, 23);
-    println!("func table size:{}", function_table_size);
-    let data_table_size = gef_file_data.as_integer(24, 27);
-
-    let mut map = Map{function_table: HashMap::new(), data_table: HashMap::new()};
-    
-    let counter = 0;
-    for chunk in gef_file_data[28..function_table_size+28].chunks(16) {
-        println!("chunk: {:?}", chunk);
-        map.function_table.insert(
-            counter,
-            (
-                chunk[0..=7].try_into().unwrap(),
-                chunk[8..=8].try_into().unwrap(),
-                chunk[9..=16].try_into().unwrap()
-            )
-        );
-    }
-    println!("{:?}", map);
-    Some((version, gef_type, entrypoint))
+    // Parsing map_size
+    let (input, map_size) = be_u32(input)?;
+    Ok((
+        input,
+        GEFHeader {
+            magic_number,
+            version: (version[0], version[1], version[2]),
+            gef_file_type,
+            entrypoint,
+            map_size
+        }
+    ))
 }
 
-trait ByteString { //バイト列（文字列ではない）
-    fn as_integer(&self, start: usize, end: usize) -> usize;
+pub fn create_map(input: &[u8]) { // "input" must be without headers.
+    let mut map = Map{
+        function_table: HashMap::new(), 
+        data_table: HashMap::new()
+    };
+
+
 }
 
-impl ByteString for Vec<u8> {
-    fn as_integer(&self, start: usize, end: usize) -> usize {
-        self[start..=end].iter().fold(0, |acc, &n| acc<<8 | n as usize)
-    }
+pub fn load_gef(gef_file_data: &[u8]) -> (&[u8], GEFHeader) {
+    let (without_header, header) = load_gef_header(gef_file_data).unwrap();
+    return (without_header, header);
 }

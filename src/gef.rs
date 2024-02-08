@@ -57,7 +57,8 @@ fn main() {
     };
     let mut gef_file_data = Vec::new();
     let _ = gef_file.read_to_end(&mut gef_file_data);
-    loader::load_gef(gef_file_data);
+    let gef_file_data = gef_file_data.as_slice();
+    println!("{:?}", loader::load_gef(gef_file_data));
 
     ()
 }
