@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap};
 
 use nom::{
     bytes::{complete::{tag, take}},
@@ -25,14 +25,15 @@ pub struct GEFHeader {
 
 #[derive(Debug)]
 pub struct Map {
-    function_table: HashMap<usize, ([u8;7], [u8;1], [u8; 8])>,
-    data_table: HashMap<usize, ([u8; 3], [u8; 1], [u8; 8])>
+    function_table: HashMap<usize, MapField>,
+    data_table: HashMap<usize, MapField>
 }
 
+#[derive(Debug)]
 pub struct MapField {
-    name: [u8; 7],
-    is_private: u8,
-    address: u32
+    name_address: u32,
+    name_size: u64,
+    address: u64
 }
 
 pub fn load_gef_header(gef_file_data: &[u8]) ->IResult<&[u8], GEFHeader> {
@@ -69,16 +70,47 @@ pub fn load_gef_header(gef_file_data: &[u8]) ->IResult<&[u8], GEFHeader> {
     ))
 }
 
-pub fn create_map(input: &[u8]) { // "input" must be without headers.
-    let mut map = Map{
+pub fn create_map(input: &[u8], map_size: u32) -> IResult<&[u8], Map> { // "input" must be without headers.
+
+    let map_field_size = std::mem::size_of::<MapField> as u32;
+
+    let mut map = Map {
         function_table: HashMap::new(), 
         data_table: HashMap::new()
     };
+    let input = &input[..map_size as usize]; // At this point, input became raw map binary
+    
+    let (input, func_table_size) = be_u32(input)?;
+    let (input, data_table_size) = be_u32(input)?;
 
+    //let mut func_index = 0;
+    //let mut data_index = 0;
+    
+    if map_size != 4+4+func_table_size+data_table_size {
+        panic!("Error: The size or composition of the map is invalid.")
+    };
 
+    let num_of_func = func_table_size / map_field_size;
+    let num_of_data = data_table_size / map_field_size;
+
+    for (i, chunk) in input.chunks(map_field_size as usize).enumerate() {
+        let (chunk, name_address) = be_u32(chunk)?;
+        let (chunk, name_size) = be_u64(chunk)?;
+        let (_, address) = be_u64(chunk)?;
+
+        let map_field = MapField{name_address, name_size, address};
+
+        if i <= (num_of_func as usize -1) {
+            map.function_table.insert(i, map_field).unwrap();
+        } else {
+            map.data_table.insert(i - (num_of_func as usize - 1), map_field).unwrap();
+        }
+    };
+    Ok((input, map))
 }
 
 pub fn load_gef(gef_file_data: &[u8]) -> (&[u8], GEFHeader) {
     let (without_header, header) = load_gef_header(gef_file_data).unwrap();
+    let (without_map, map) = create_map(without_header, header.map_size).unwrap();
     return (without_header, header);
 }

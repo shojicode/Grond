@@ -1,22 +1,22 @@
 use std::{env, error::Error, fs::{File}, io::Read};
-mod loader;
-mod runtime;
+
+mod gir_parser;
 
 const VERSION: &str = "
-    Grond Runtime(GRT)
+    Grond Backend(GBE)
 
       Version 0.0.1
 ";
 
 const HELP: &str = "
-    Grond Runtime Help
+    Grond Buckend Help
     
 # Command Format
-$ grt [options] file_path [args]
+$ gbe [options] file_path [args]
 
 # Options
---version / -v : Show GRT version.
---help    / -h : Show GRT help.
+--version / -v : Show GBE version.
+--help    / -h : Show GBE help.
 ";
 
 fn main() {
@@ -58,7 +58,6 @@ fn main() {
     let mut gef_file_data = Vec::new();
     let _ = gef_file.read_to_end(&mut gef_file_data);
     let gef_file_data = gef_file_data.as_slice();
-    println!("{:?}", loader::load_gef(gef_file_data));
 
     ()
 }

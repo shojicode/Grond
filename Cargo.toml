@@ -10,8 +10,8 @@ name = "grt"
 path = "src/grt.rs"
 
 [[bin]]
-name = "gef"
-path = "src/gef.rs"
+name = "gbe"
+path = "src/gbe.rs"
 
 [dependencies]
 "nom" = "7"
